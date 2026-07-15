@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataPipeline",
+    "displayName": "pl_landing_nyc_ingest"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "529a02e8-99c5-82a5-45c4-0f952ac2a8c2"
+  }
+}

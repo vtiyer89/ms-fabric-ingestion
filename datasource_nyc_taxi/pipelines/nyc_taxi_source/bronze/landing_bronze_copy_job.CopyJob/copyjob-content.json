@@ -1,0 +1,88 @@
+{
+  "properties": {
+    "jobMode": "Batch",
+    "source": {
+      "type": "Parquet",
+      "connectionSettings": {
+        "type": "Lakehouse",
+        "typeProperties": {
+          "workspaceId": "37f9f143-c972-45c2-9ae6-995b7639dff5",
+          "artifactId": "95e9be52-6ce5-4912-9264-d8c101939c5f",
+          "rootFolder": "Files"
+        }
+      }
+    },
+    "destination": {
+      "type": "LakehouseTable",
+      "connectionSettings": {
+        "type": "Lakehouse",
+        "typeProperties": {
+          "workspaceId": "3ab4eb52-fcd3-48e0-a92c-3e3feb437a79",
+          "artifactId": "0bd61d00-d794-4351-8791-faeb94879e25",
+          "rootFolder": "Tables"
+        }
+      }
+    },
+    "policy": {
+      "timeout": "0.12:00:00",
+      "retry": 0
+    }
+  },
+  "activities": [
+    {
+      "id": "e31c22fc-06df-40c8-800d-de9e0146cd20",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "location": {
+              "type": "LakehouseLocation",
+              "fileName": "yellow_tripdata_2026-01.parquet"
+            },
+            "compressionCodec": "snappy"
+          },
+          "storeSettings": {
+            "recursive": true,
+            "enablePartitionDiscovery": false
+          }
+        },
+        "destination": {
+          "partitionOption": "None",
+          "writeBehavior": "Overwrite",
+          "datasetSettings": {
+            "schema": "dbo",
+            "table": "yellow_cab_trip_data_bronze"
+          },
+          "applyVOrder": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": true,
+            "treatBooleanAsNumber": false
+          }
+        },
+        "auditColumns": [
+          {
+            "name": "copy_job_id",
+            "value": "$$COPYJOBID"
+          },
+          {
+            "name": "copy_job_run_id",
+            "value": "$$COPYJOBRUNID"
+          },
+          {
+            "name": "copy_job_name",
+            "value": "$$COPYJOBNAME"
+          },
+          {
+            "name": "timestamp",
+            "value": "$$NOW"
+          }
+        ]
+      }
+    }
+  ]
+}

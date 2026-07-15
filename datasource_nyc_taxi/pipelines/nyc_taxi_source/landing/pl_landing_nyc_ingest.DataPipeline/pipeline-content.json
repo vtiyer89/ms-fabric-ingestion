@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "landing_triggered",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "variableName": "pipelineReturnValue",
+          "value": [
+            {
+              "key": "trigger_value",
+              "value": {
+                "type": "String",
+                "content": "success"
+              }
+            }
+          ],
+          "setSystemVariable": true
+        }
+      }
+    ]
+  }
+}
