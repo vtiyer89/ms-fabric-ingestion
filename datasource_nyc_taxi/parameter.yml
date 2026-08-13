@@ -1,0 +1,50 @@
+# fabric-cicd parameterization for the "Ingestion" workspace
+# (landing lakehouse, bronze lakehouse, landing/bronze pipelines, bronze copy job)
+#
+# Environments: DEV (current hardcoded values, kept here for documentation/debug_parameterization.py),
+#               TEST (fill in the placeholders below once the Test workspace + its items exist)
+#
+# See docs/fabric-test-workspace-sync.md for how to obtain each TEST value.
+
+find_replace:
+    # --- Connection used by pl_bronze_nyc_taxi's InvokeCopyJob activity ---
+    - find_value: "bdfd8e6a-abb7-41ba-9d3b-4b5707901b54"
+      replace_value:
+          DEV: "bdfd8e6a-abb7-41ba-9d3b-4b5707901b54"
+          TEST: "070f434a-cac1-40a0-97e4-c85a7a288233"
+      item_type: "DataPipeline"
+      item_name: "pl_bronze_nyc_taxi"
+
+    # --- landing_bronze_copy_job destination: this workspace's own bronze lakehouse (self-reference) ---
+    - find_value: "3ab4eb52-fcd3-48e0-a92c-3e3feb437a79"
+      replace_value:
+          _ALL_: "$workspace.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
+
+    - find_value: "0bd61d00-d794-4351-8791-faeb94879e25"
+      replace_value:
+          _ALL_: "$items.Lakehouse.lh_bronze_nyc_taxi.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
+
+    # --- landing_bronze_copy_job source: this workspace's own landing lakehouse (self-reference) ---
+    # NOTE: in the exported Dev JSON this source workspaceId does NOT match the destination
+    # workspaceId above, even though both lakehouses live under this same workspace folder.
+    # Verify landing and bronze are genuinely in the same workspace before relying on $workspace.$id
+    # here — see the "Topology assumptions to verify" section in the process doc.
+    - find_value: "37f9f143-c972-45c2-9ae6-995b7639dff5"
+      replace_value:
+          _ALL_: "$workspace.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
+
+    - find_value: "95e9be52-6ce5-4912-9264-d8c101939c5f"
+      replace_value:
+          _ALL_: "$items.Lakehouse.lh_landing_nyc_taxi.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"

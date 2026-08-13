@@ -1,0 +1,14 @@
+name: Deploy to Fabric Test Workspace
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
+    with:
+      workspace-id: ${{ vars.TEST_WORKSPACE_ID }}
+      environment-name: TEST
+      repository-directory: datasource_nyc_taxi
+      items-in-scope: "Lakehouse,DataPipeline,CopyJob"
+    secrets: inherit
