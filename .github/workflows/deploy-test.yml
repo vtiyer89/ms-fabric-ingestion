@@ -1,14 +1,31 @@
 name: Deploy to Fabric Test Workspace
 
+# TEMPORARY: inlined instead of calling ms-fabric-platform-core's reusable workflow, because
+# this repo doesn't yet have Actions access granted to platform-core's reusable workflow.
+# Revert to the `uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main`
+# form (and delete scripts/deploy_fabric_item.py + scripts/requirements.txt from this repo)
+# once platform-core's Settings -> Actions -> General -> Access is granted to this repo.
+# See docs/fabric-test-workspace-sync.md in ms-fabric-platform-core for the permanent setup.
+
 on:
   workflow_dispatch: {}
 
 jobs:
   deploy:
-    uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
-    with:
-      workspace-id: ${{ vars.TEST_WORKSPACE_ID }}
-      environment-name: TEST
-      repository-directory: datasource_nyc_taxi
-      items-in-scope: "Lakehouse,DataPipeline,CopyJob"
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r scripts/requirements.txt
+      - run: |
+          python scripts/deploy_fabric_item.py \
+            --workspace-id "${{ vars.TEST_WORKSPACE_ID }}" \
+            --environment TEST \
+            --repository-directory datasource_nyc_taxi \
+            --items-in-scope Lakehouse,DataPipeline,CopyJob
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
