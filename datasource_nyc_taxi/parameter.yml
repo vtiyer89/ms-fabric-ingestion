@@ -21,30 +21,26 @@ find_replace:
           _ALL_: "$workspace.$id"
       item_type: "CopyJob"
       item_name: "landing_bronze_copy_job"
-      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
 
     - find_value: "0bd61d00-d794-4351-8791-faeb94879e25"
       replace_value:
           _ALL_: "$items.Lakehouse.lh_bronze_nyc_taxi.$id"
       item_type: "CopyJob"
       item_name: "landing_bronze_copy_job"
-      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
 
     # --- landing_bronze_copy_job source: this workspace's own landing lakehouse (self-reference) ---
     # NOTE: in the exported Dev JSON this source workspaceId does NOT match the destination
     # workspaceId above, even though both lakehouses live under this same workspace folder.
     # Verify landing and bronze are genuinely in the same workspace before relying on $workspace.$id
-    # here — see the "Topology assumptions to verify" section in the process doc.
+    # here — see the "Topology: Test workspaces actually in use" section in the process doc.
     - find_value: "37f9f143-c972-45c2-9ae6-995b7639dff5"
       replace_value:
           _ALL_: "$workspace.$id"
       item_type: "CopyJob"
       item_name: "landing_bronze_copy_job"
-      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
 
     - find_value: "95e9be52-6ce5-4912-9264-d8c101939c5f"
       replace_value:
           _ALL_: "$items.Lakehouse.lh_landing_nyc_taxi.$id"
       item_type: "CopyJob"
       item_name: "landing_bronze_copy_job"
-      file_path: "landing_bronze_copy_job.CopyJob/copyjob-content.json"
