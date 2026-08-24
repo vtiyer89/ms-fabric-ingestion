@@ -1,31 +1,41 @@
-name: Deploy to Fabric Test Workspace
+name: Deploy to Fabric Test Workspaces
 
-# TEMPORARY: inlined instead of calling ms-fabric-platform-core's reusable workflow, because
-# this repo doesn't yet have Actions access granted to platform-core's reusable workflow.
-# Revert to the `uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main`
-# form (and delete scripts/deploy_fabric_item.py + scripts/requirements.txt from this repo)
-# once platform-core's Settings -> Actions -> General -> Access is granted to this repo.
-# See docs/fabric-test-workspace-sync.md in ms-fabric-platform-core for the permanent setup.
-
+# Landing and Bronze are separate Fabric workspaces, so this repo has two deploy jobs — the
+# same shape as ms-fabric-dd-trip-data's silver/gold split.
+#
+# Both jobs share one repository-directory (and therefore one parameter.yml); `items-to-include`
+# decides which items each publishes. The two lists together must cover every item in
+# datasource_nyc_taxi, or the uncovered ones are silently never deployed.
+#
+# Bronze waits on Landing: landing_bronze_copy_job's source resolves lh_landing_nyc_taxi by
+# name in the Landing workspace, so that lakehouse must exist first.
 on:
   workflow_dispatch: {}
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -r scripts/requirements.txt
-      - run: |
-          python scripts/deploy_fabric_item.py \
-            --workspace-id "${{ vars.TEST_WORKSPACE_ID }}" \
-            --environment TEST \
-            --repository-directory datasource_nyc_taxi \
-            --items-in-scope Lakehouse,DataPipeline,CopyJob
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  deploy-landing:
+    uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
+    with:
+      workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
+      environment-name: TEST
+      repository-directory: datasource_nyc_taxi
+      items-in-scope: "Lakehouse,DataPipeline,CopyJob"
+      items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
+    secrets: inherit
+
+  deploy-bronze:
+    needs: deploy-landing
+    uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
+    with:
+      workspace-id: ${{ vars.TEST_BRONZE_WORKSPACE_ID }}
+      environment-name: TEST
+      repository-directory: datasource_nyc_taxi
+      items-in-scope: "Lakehouse,DataPipeline,CopyJob"
+      items-to-include: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline,landing_bronze_copy_job.CopyJob"
+      # Connection IDs — the only parameter.yml values that can't resolve live.
+      # FABRIC_PARAM_<NAME> becomes $ENV:<NAME> inside parameter.yml.
+      # Pass repo Variables here, never Secrets: these values appear in workflow logs.
+      parameter-env-vars: |
+        FABRIC_PARAM_DEV_COPY_JOB_CONNECTION_ID=${{ vars.DEV_COPY_JOB_CONNECTION_ID }}
+        FABRIC_PARAM_TEST_COPY_JOB_CONNECTION_ID=${{ vars.TEST_COPY_JOB_CONNECTION_ID }}
+    secrets: inherit
