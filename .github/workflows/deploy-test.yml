@@ -21,6 +21,12 @@ jobs:
       repository-directory: datasource_nyc_taxi
       items-in-scope: "Lakehouse,DataPipeline,CopyJob"
       items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
+      # Both jobs share one parameter.yml, and its $ENV: tokens are resolved for the whole file
+      # regardless of items-to-include — so this job needs the same variables as deploy-bronze
+      # even though no landing item uses the copy-job connection.
+      parameter-env-vars: |
+        FABRIC_PARAM_DEV_COPY_JOB_CONNECTION_ID=${{ vars.DEV_COPY_JOB_CONNECTION_ID }}
+        FABRIC_PARAM_TEST_COPY_JOB_CONNECTION_ID=${{ vars.TEST_COPY_JOB_CONNECTION_ID }}
     secrets: inherit
 
   deploy-bronze:
