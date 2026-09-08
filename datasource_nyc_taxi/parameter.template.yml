@@ -1,0 +1,78 @@
+# ============================================================================
+# TEMPLATE — every tenant-specific value is a <PLACEHOLDER>. Copy to
+# parameter.yml in this same directory and fill it in. See
+# ms-fabric-platform-core/docs/ado-parameter-templating.md for what each one is
+# and where to find it.
+#
+# Two classes of placeholder, filled in different ways:
+#
+#   <YOUR-DEV-*>          GUIDs from YOUR Dev tenant. These are find_value entries and must
+#                         match the GUID literally present in the git-exported item JSON, or
+#                         fabric-cicd skips the rule silently and ships the Dev value. The
+#                         deploy script's assert_find_values_present guard fails the run if
+#                         one matches nothing — that guard is the safety net, use it.
+#
+#   <YOUR-TEST-*-WS-NAME> Test workspace DISPLAY names, matched literally and CASE-SENSITIVELY
+#                         by the Fabric API. Also held in the fabric-cicd-common variable
+#                         group, so keep the two in step when a workspace is renamed.
+#
+# Connection IDs are NOT placeholders here — they stay as $ENV: tokens fed from the per-repo
+# variable group, because they are the one class that cannot resolve live.
+# ============================================================================
+
+# fabric-cicd parameterization for the "Ingestion" workspace
+# (landing lakehouse, bronze lakehouse, landing/bronze pipelines, bronze copy job)
+#
+# Environments: DEV (current hardcoded values, kept here for documentation/debug_parameterization.py),
+#               TEST (fill in the placeholders below once the Test workspace + its items exist)
+#
+# See docs/fabric-test-workspace-sync.md for how to obtain each TEST value.
+
+find_replace:
+    # --- Connection used by pl_bronze_nyc_taxi's InvokeCopyJob activity ---
+    # Connections are tenant objects, not Fabric items, so no $workspace/$items variable
+    # reaches them — these are the only values here that can't resolve live. Supplied instead
+    # as GitHub repo Variables via FABRIC_PARAM_<NAME> (see scripts/deploy_fabric_item.py).
+    # DEV_COPY_JOB_CONNECTION_ID must match the GUID actually present in the item JSON, or the
+    # rule silently matches nothing — the deploy script asserts this before publishing.
+    - find_value: "$ENV:DEV_COPY_JOB_CONNECTION_ID"
+      replace_value:
+          DEV: "$ENV:DEV_COPY_JOB_CONNECTION_ID"
+          TEST: "$ENV:TEST_COPY_JOB_CONNECTION_ID"
+      item_type: "DataPipeline"
+      item_name: "pl_bronze_nyc_taxi"
+
+    # --- landing_bronze_copy_job destination: the BRONZE workspace's own bronze lakehouse ---
+    # Still a self-reference: the copy job is published by the bronze job, so $workspace.$id
+    # is the Bronze workspace.
+    - find_value: "<YOUR-DEV-BRONZE-WORKSPACE-ID>"
+      replace_value:
+          _ALL_: "$workspace.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+
+    - find_value: "<YOUR-DEV-LH-BRONZE-ID>"
+      replace_value:
+          _ALL_: "$items.Lakehouse.lh_bronze_nyc_taxi.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+
+    # --- landing_bronze_copy_job source: the LANDING workspace's landing lakehouse ---
+    # The copy job is published by the bronze job, so its source is now a genuine
+    # cross-workspace reference rather than a self-reference. The source/destination workspace
+    # mismatch in the Dev export turns out to be correct: landing and bronze really are
+    # separate workspaces. These resolve live, so the Landing workspace must deploy first —
+    # `needs: deploy-landing` in the caller workflow enforces that.
+    - find_value: "<YOUR-DEV-LANDING-WORKSPACE-ID>"
+      replace_value:
+          DEV: "<YOUR-DEV-LANDING-WORKSPACE-ID>"
+          TEST: "$workspace.<YOUR-TEST-LANDING-WS-NAME>.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"
+
+    - find_value: "<YOUR-DEV-LH-LANDING-ID>"
+      replace_value:
+          DEV: "<YOUR-DEV-LH-LANDING-ID>"
+          TEST: "$workspace.<YOUR-TEST-LANDING-WS-NAME>.$items.Lakehouse.lh_landing_nyc_taxi.$id"
+      item_type: "CopyJob"
+      item_name: "landing_bronze_copy_job"

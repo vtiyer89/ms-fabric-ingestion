@@ -1,0 +1,54 @@
+# Deploy ms-fabric-ingestion to the Fabric Test workspaces (Azure DevOps).
+#
+# Landing and Bronze are separate Fabric workspaces, so this pipeline has two jobs — the same
+# shape as ms-fabric-dd-trip-data's silver/gold split.
+#
+# Both jobs share one repositoryDirectory (and therefore one parameter.yml); itemsToInclude
+# decides which items each publishes. The two lists together must cover every item in
+# datasource_nyc_taxi, or the uncovered ones are silently never deployed.
+#
+# Bronze waits on Landing: landing_bronze_copy_job's source resolves lh_landing_nyc_taxi by
+# name in the Landing workspace, so that lakehouse must exist first.
+
+trigger: none
+pr: none
+
+resources:
+  repositories:
+    - repository: platform-core
+      type: git                                   # 'git' = Azure Repos. Use 'github' + a
+      name: <YOUR-ADO-PROJECT>/ms-fabric-platform-core   # service connection if it stays on GitHub.
+      ref: refs/heads/main
+
+jobs:
+  - template: pipelines/templates/deploy-fabric-item.yml@platform-core
+    parameters:
+      jobName: deploy_landing
+      jobDisplayName: "Deploy Landing"
+      variableGroups: [fabric-cicd-common, fabric-ingestion]
+      workspaceId: $(TEST_LANDING_WORKSPACE_ID)
+      environmentName: TEST
+      repositoryDirectory: datasource_nyc_taxi
+      itemsInScope: "Lakehouse,DataPipeline,CopyJob"
+      itemsToInclude: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
+      # Both jobs share one parameter.yml, and its $ENV: tokens are resolved for the whole file
+      # regardless of itemsToInclude — so this job needs the same variables as deploy_bronze
+      # even though no landing item uses the copy-job connection.
+      parameterEnvVars:
+        DEV_COPY_JOB_CONNECTION_ID: $(DEV_COPY_JOB_CONNECTION_ID)
+        TEST_COPY_JOB_CONNECTION_ID: $(TEST_COPY_JOB_CONNECTION_ID)
+
+  - template: pipelines/templates/deploy-fabric-item.yml@platform-core
+    parameters:
+      jobName: deploy_bronze
+      jobDisplayName: "Deploy Bronze"
+      dependsOn: [deploy_landing]
+      variableGroups: [fabric-cicd-common, fabric-ingestion]
+      workspaceId: $(TEST_BRONZE_WORKSPACE_ID)
+      environmentName: TEST
+      repositoryDirectory: datasource_nyc_taxi
+      itemsInScope: "Lakehouse,DataPipeline,CopyJob"
+      itemsToInclude: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline,landing_bronze_copy_job.CopyJob"
+      parameterEnvVars:
+        DEV_COPY_JOB_CONNECTION_ID: $(DEV_COPY_JOB_CONNECTION_ID)
+        TEST_COPY_JOB_CONNECTION_ID: $(TEST_COPY_JOB_CONNECTION_ID)
