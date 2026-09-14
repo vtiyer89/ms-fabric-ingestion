@@ -28,6 +28,7 @@ jobs:
       variableGroups: [fabric-cicd-common, fabric-ingestion]
       workspaceId: $(TEST_LANDING_WORKSPACE_ID)
       environmentName: TEST
+      platformWorkspaceId: $(FABRIC_PLATFORM_WORKSPACE_ID)
       repositoryDirectory: datasource_nyc_taxi
       itemsInScope: "Lakehouse,DataPipeline,CopyJob"
       itemsToInclude: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
@@ -46,6 +47,7 @@ jobs:
       variableGroups: [fabric-cicd-common, fabric-ingestion]
       workspaceId: $(TEST_BRONZE_WORKSPACE_ID)
       environmentName: TEST
+      platformWorkspaceId: $(FABRIC_PLATFORM_WORKSPACE_ID)
       repositoryDirectory: datasource_nyc_taxi
       itemsInScope: "Lakehouse,DataPipeline,CopyJob"
       itemsToInclude: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline,landing_bronze_copy_job.CopyJob"

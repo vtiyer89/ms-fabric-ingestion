@@ -18,6 +18,7 @@ jobs:
     with:
       workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
       environment-name: TEST
+      platform-workspace-id: ${{ vars.FABRIC_PLATFORM_WORKSPACE_ID }}
       repository-directory: datasource_nyc_taxi
       items-in-scope: "Lakehouse,DataPipeline,CopyJob"
       items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
@@ -35,6 +36,7 @@ jobs:
     with:
       workspace-id: ${{ vars.TEST_BRONZE_WORKSPACE_ID }}
       environment-name: TEST
+      platform-workspace-id: ${{ vars.FABRIC_PLATFORM_WORKSPACE_ID }}
       repository-directory: datasource_nyc_taxi
       items-in-scope: "Lakehouse,DataPipeline,CopyJob"
       items-to-include: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline,landing_bronze_copy_job.CopyJob"
