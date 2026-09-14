@@ -10,7 +10,16 @@ name: Deploy to Fabric Test Workspaces
 # Bronze waits on Landing: landing_bronze_copy_job's source resolves lh_landing_nyc_taxi by
 # name in the Landing workspace, so that lakehouse must exist first.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      platform-core-ref:
+        description: >
+          Branch or tag of ms-fabric-platform-core to take the deploy and seed SCRIPTS from.
+          Use a feature branch to test script changes. NOTE the reusable workflow DEFINITION
+          still comes from @main — `uses:` cannot be an expression in GitHub Actions — so a
+          change to deploy-fabric-item.yml itself is not exercised by this.
+        type: string
+        default: main
 
 jobs:
   deploy-landing:
@@ -18,6 +27,7 @@ jobs:
     with:
       workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
       environment-name: TEST
+      platform-core-ref: ${{ inputs.platform-core-ref }}
       platform-workspace-id: ${{ vars.FABRIC_PLATFORM_WORKSPACE_ID }}
       repository-directory: datasource_nyc_taxi
       items-in-scope: "Lakehouse,DataPipeline,CopyJob"
@@ -36,6 +46,7 @@ jobs:
     with:
       workspace-id: ${{ vars.TEST_BRONZE_WORKSPACE_ID }}
       environment-name: TEST
+      platform-core-ref: ${{ inputs.platform-core-ref }}
       platform-workspace-id: ${{ vars.FABRIC_PLATFORM_WORKSPACE_ID }}
       repository-directory: datasource_nyc_taxi
       items-in-scope: "Lakehouse,DataPipeline,CopyJob"
