@@ -1,15 +1,20 @@
 {
   "properties": {
+    "parameters": {
+      "SourceSystemName": {
+        "type": "String",
+        "defaultValue": "nyc_taxi_yellow"
+      },
+      "TargetName": {
+        "type": "String",
+        "defaultValue": "yellow_cab_trip_data_bronze"
+      }
+    },
     "activities": [
       {
-        "type": "InvokeCopyJob",
-        "typeProperties": {
-          "copyJobId": "3c29bd7a-74f3-9885-46b9-80bedc348393",
-          "workspaceId": "00000000-0000-0000-0000-000000000000"
-        },
-        "externalReferences": {
-          "connection": "bdfd8e6a-abb7-41ba-9d3b-4b5707901b54"
-        },
+        "type": "Lookup",
+        "name": "lkp_source",
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -17,8 +22,207 @@
           "secureInput": false,
           "secureOutput": false
         },
-        "name": "copy_landing_bronze",
-        "dependsOn": []
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": "SELECT TOP (1) SourceSystemName, SourceType, Config FROM metadata.SourceSystemConfig WHERE SourceSystemName = @SourceSystemName AND IsActive = 1",
+            "queryTimeout": "02:00:00",
+            "isolationLevel": "ReadCommitted",
+            "partitionOption": "None",
+            "additionalColumns": [],
+            "sqlReaderQueryParameters": [
+              {
+                "name": "SourceSystemName",
+                "value": {
+                  "value": "@pipeline().parameters.SourceSystemName",
+                  "type": "Expression"
+                },
+                "type": "String"
+              }
+            ]
+          },
+          "datasetSettings": {
+            "type": "AzureSqlTable",
+            "typeProperties": {
+              "schema": "metadata",
+              "table": "SourceSystemConfig"
+            },
+            "externalReferences": {
+              "connection": "deadbeef-0000-0000-0000-000000000001"
+            }
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "type": "Lookup",
+        "name": "lkp_target",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": "SELECT TOP (1) TargetName, TargetPath, LayerName, TargetWorkSpaceId, TargetLakehouseId, TargetSchema, Config FROM metadata.TargetStoreConfig WHERE TargetName = @TargetName AND IsActive = 1",
+            "queryTimeout": "02:00:00",
+            "isolationLevel": "ReadCommitted",
+            "partitionOption": "None",
+            "additionalColumns": [],
+            "sqlReaderQueryParameters": [
+              {
+                "name": "TargetName",
+                "value": {
+                  "value": "@pipeline().parameters.TargetName",
+                  "type": "Expression"
+                },
+                "type": "String"
+              }
+            ]
+          },
+          "datasetSettings": {
+            "type": "AzureSqlTable",
+            "typeProperties": {
+              "schema": "metadata",
+              "table": "TargetStoreConfig"
+            },
+            "externalReferences": {
+              "connection": "deadbeef-0000-0000-0000-000000000001"
+            }
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "type": "Copy",
+        "name": "cp_landing_to_bronze",
+        "dependsOn": [
+          {
+            "activity": "lkp_source",
+            "dependencyConditions": ["Succeeded"]
+          },
+          {
+            "activity": "lkp_target",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "ParquetSource",
+            "storeSettings": {
+              "type": "LakehouseReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "datasetSettings": {
+              "type": "Parquet",
+              "typeProperties": {
+                "location": {
+                  "type": "LakehouseLocation",
+                  "fileName": {
+                    "value": "@activity('lkp_source').output.firstRow.Config.fileName",
+                    "type": "Expression"
+                  }
+                },
+                "compressionCodec": {
+                  "value": "@activity('lkp_source').output.firstRow.Config.compression",
+                  "type": "Expression"
+                }
+              },
+              "connectionSettings": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "workspaceId": "37f9f143-c972-45c2-9ae6-995b7639dff5",
+                  "artifactId": "95e9be52-6ce5-4912-9264-d8c101939c5f",
+                  "rootFolder": "Files"
+                }
+              }
+            }
+          },
+          "sink": {
+            "type": "LakehouseTableSink",
+            "tableActionOption": "Overwrite",
+            "partitionOption": "None",
+            "datasetSettings": {
+              "type": "LakehouseTable",
+              "typeProperties": {
+                "schema": {
+                  "value": "@activity('lkp_target').output.firstRow.TargetSchema",
+                  "type": "Expression"
+                },
+                "table": {
+                  "value": "@activity('lkp_target').output.firstRow.TargetName",
+                  "type": "Expression"
+                }
+              },
+              "connectionSettings": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "workspaceId": {
+                    "value": "@activity('lkp_target').output.firstRow.TargetWorkSpaceId",
+                    "type": "Expression"
+                  },
+                  "artifactId": {
+                    "value": "@activity('lkp_target').output.firstRow.TargetLakehouseId",
+                    "type": "Expression"
+                  },
+                  "rootFolder": "Tables"
+                }
+              }
+            }
+          },
+          "enableStaging": false,
+          "translator": {
+            "type": "TabularTranslator"
+          },
+          "typeConversionSettings": {
+            "typeConversion": {
+              "allowDataTruncation": true,
+              "treatBooleanAsNumber": false
+            }
+          },
+          "auditColumns": [
+            {
+              "name": "copy_job_id",
+              "value": {
+                "value": "@pipeline().Pipeline",
+                "type": "Expression"
+              }
+            },
+            {
+              "name": "copy_job_run_id",
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              }
+            },
+            {
+              "name": "copy_job_name",
+              "value": {
+                "value": "@activity('cp_landing_to_bronze').name",
+                "type": "Expression"
+              }
+            },
+            {
+              "name": "timestamp",
+              "value": {
+                "value": "@utcnow()",
+                "type": "Expression"
+              }
+            }
+          ]
+        }
       }
     ]
   }

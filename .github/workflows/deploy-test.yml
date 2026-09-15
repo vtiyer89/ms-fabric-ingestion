@@ -19,14 +19,13 @@ jobs:
       workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
       environment-name: TEST
       repository-directory: datasource_nyc_taxi
-      items-in-scope: "Lakehouse,DataPipeline,CopyJob"
+      items-in-scope: "Lakehouse,DataPipeline"
       items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
       # Both jobs share one parameter.yml, and its $ENV: tokens are resolved for the whole file
       # regardless of items-to-include — so this job needs the same variables as deploy-bronze
-      # even though no landing item uses the copy-job connection.
+      # even though no landing item uses the platform metadata DB connection.
       parameter-env-vars: |
-        FABRIC_PARAM_DEV_COPY_JOB_CONNECTION_ID=${{ vars.DEV_COPY_JOB_CONNECTION_ID }}
-        FABRIC_PARAM_TEST_COPY_JOB_CONNECTION_ID=${{ vars.TEST_COPY_JOB_CONNECTION_ID }}
+        FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID=${{ vars.TEST_PLATFORM_METADATA_DB_CONNECTION_ID }}
     secrets: inherit
 
   deploy-bronze:
@@ -36,12 +35,13 @@ jobs:
       workspace-id: ${{ vars.TEST_BRONZE_WORKSPACE_ID }}
       environment-name: TEST
       repository-directory: datasource_nyc_taxi
-      items-in-scope: "Lakehouse,DataPipeline,CopyJob"
-      items-to-include: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline,landing_bronze_copy_job.CopyJob"
-      # Connection IDs — the only parameter.yml values that can't resolve live.
-      # FABRIC_PARAM_<NAME> becomes $ENV:<NAME> inside parameter.yml.
+      items-in-scope: "Lakehouse,DataPipeline"
+      items-to-include: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline"
+      # landing_bronze_copy_job.CopyJob is gone — pl_bronze_nyc_taxi now does the copy itself via
+      # a Lookup+Copy chain against platform-core's metadata DB (see
+      # ms-fabric-platform-core/docs/metadata-db-mapping.md). The one connection ID that can't
+      # resolve live is now the SQL connection to that DB, not a CopyJob connection.
       # Pass repo Variables here, never Secrets: these values appear in workflow logs.
       parameter-env-vars: |
-        FABRIC_PARAM_DEV_COPY_JOB_CONNECTION_ID=${{ vars.DEV_COPY_JOB_CONNECTION_ID }}
-        FABRIC_PARAM_TEST_COPY_JOB_CONNECTION_ID=${{ vars.TEST_COPY_JOB_CONNECTION_ID }}
+        FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID=${{ vars.TEST_PLATFORM_METADATA_DB_CONNECTION_ID }}
     secrets: inherit
