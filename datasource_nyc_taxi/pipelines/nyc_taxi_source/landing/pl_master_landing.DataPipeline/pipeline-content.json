@@ -28,7 +28,7 @@
         },
         "typeProperties": {
           "source": {
-            "type": "AzureSqlSource",
+            "type": "FabricSqlDatabaseSource",
             "sqlReaderStoredProcedureName": "[metadata].[usp_GetCopyJobConfig]",
             "storedProcedureParameters": {
               "SourceObjectName": {
@@ -50,13 +50,26 @@
             "partitionOption": "None"
           },
           "datasetSettings": {
-            "type": "AzureSqlTable",
+            "annotations": [],
+            "connectionSettings": {
+              "name": "db_platform_metadata",
+              "properties": {
+                "annotations": [],
+                "type": "FabricSqlDatabase",
+                "typeProperties": {
+                  "workspaceId": "deadbeef-0000-0000-0000-000000000003",
+                  "artifactId": "deadbeef-0000-0000-0000-000000000004"
+                },
+                "externalReferences": {
+                  "connection": "deadbeef-0000-0000-0000-000000000001"
+                }
+              }
+            },
+            "type": "FabricSqlDatabaseTable",
+            "schema": [],
             "typeProperties": {
               "schema": "metadata",
               "table": "SourceObjectConfig"
-            },
-            "externalReferences": {
-              "connection": "deadbeef-0000-0000-0000-000000000001"
             }
           },
           "firstRowOnly": true
@@ -75,7 +88,7 @@
         },
         "typeProperties": {
           "source": {
-            "type": "AzureSqlSource",
+            "type": "FabricSqlDatabaseSource",
             "sqlReaderStoredProcedureName": "[metadata].[usp_GetCopyJobConfig]",
             "storedProcedureParameters": {
               "SourceObjectName": {
@@ -97,13 +110,26 @@
             "partitionOption": "None"
           },
           "datasetSettings": {
-            "type": "AzureSqlTable",
+            "annotations": [],
+            "connectionSettings": {
+              "name": "db_platform_metadata",
+              "properties": {
+                "annotations": [],
+                "type": "FabricSqlDatabase",
+                "typeProperties": {
+                  "workspaceId": "deadbeef-0000-0000-0000-000000000003",
+                  "artifactId": "deadbeef-0000-0000-0000-000000000004"
+                },
+                "externalReferences": {
+                  "connection": "deadbeef-0000-0000-0000-000000000001"
+                }
+              }
+            },
+            "type": "FabricSqlDatabaseTable",
+            "schema": [],
             "typeProperties": {
               "schema": "metadata",
               "table": "SourceObjectConfig"
-            },
-            "externalReferences": {
-              "connection": "deadbeef-0000-0000-0000-000000000001"
             }
           },
           "firstRowOnly": true

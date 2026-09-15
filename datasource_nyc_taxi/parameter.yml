@@ -27,6 +27,31 @@ find_replace:
       item_type: "DataPipeline"
       item_name: "pl_master_landing"
 
+    # --- pl_master_landing's two Lookup activities: the native item reference inside
+    # datasetSettings.connectionSettings.properties.typeProperties (workspaceId + artifactId of
+    # db_platform_metadata). Discovered 2026-09-15 by building a throwaway scratch pipeline in
+    # the Fabric UI and reading back what it generated — the designer's "FabricSqlDatabaseTable"
+    # dataset needs BOTH this native item reference AND the external connection rule above; the
+    # connection alone (what was originally tried) fails with "FabricSqlDatabaseCredential not
+    # found in linked service registry". Same deploy-time-identity pattern as every Lakehouse
+    # reference elsewhere in this repo — live lookup by display name, self-healing if the
+    # workspace/item is ever recreated. "deadbeef-...-000000000003"/"...000000000004" are
+    # placeholders for the same reason as the connection rule above: no Dev platform workspace
+    # exists yet, so DEV deliberately stays unresolved.
+    - find_value: "deadbeef-0000-0000-0000-000000000003"
+      replace_value:
+          DEV: "deadbeef-0000-0000-0000-000000000003"
+          TEST: "$workspace.ws-test-platform-core-v2.$id"
+      item_type: "DataPipeline"
+      item_name: "pl_master_landing"
+
+    - find_value: "deadbeef-0000-0000-0000-000000000004"
+      replace_value:
+          DEV: "deadbeef-0000-0000-0000-000000000004"
+          TEST: "$workspace.ws-test-platform-core-v2.$items.SQLDatabase.db_platform_metadata.$id"
+      item_type: "DataPipeline"
+      item_name: "pl_master_landing"
+
     # --- pl_master_landing's InvokePipeline activity: cross-workspace reference to
     # pl_bronze_nyc_taxi (the child), published by the Bronze job to the Bronze workspace, while
     # pl_master_landing itself is published by the Landing job to the Landing workspace. Deploy-
