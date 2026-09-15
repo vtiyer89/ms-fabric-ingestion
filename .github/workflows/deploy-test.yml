@@ -7,29 +7,19 @@ name: Deploy to Fabric Test Workspaces
 # decides which items each publishes. The two lists together must cover every item in
 # datasource_nyc_taxi, or the uncovered ones are silently never deployed.
 #
-# Bronze waits on Landing: landing_bronze_copy_job's source resolves lh_landing_nyc_taxi by
-# name in the Landing workspace, so that lakehouse must exist first.
+# Landing waits on Bronze now — inverted from the old CopyJob-era order. pl_master_landing (in
+# Landing) invokes pl_bronze_nyc_taxi (in Bronze) via a cross-workspace InvokePipeline reference
+# that resolves pl_bronze_nyc_taxi's live item GUID at deploy time, so Bronze must exist first.
+# Neither pipeline has a static, deploy-time dependency on the other's lakehouse anymore — both
+# source and destination for the actual copy are resolved at *run time* by pl_master_landing via
+# metadata.usp_GetCopyJobConfig (see ms-fabric-platform-core/docs/metadata-db-mapping.md and
+# platform/sql/005_create_usp_get_copy_config.sql). The only deploy-time cross-workspace
+# reference left in this repo is pl_master_landing -> pl_bronze_nyc_taxi's item ID.
 on:
   workflow_dispatch: {}
 
 jobs:
-  deploy-landing:
-    uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
-    with:
-      workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
-      environment-name: TEST
-      repository-directory: datasource_nyc_taxi
-      items-in-scope: "Lakehouse,DataPipeline"
-      items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
-      # Both jobs share one parameter.yml, and its $ENV: tokens are resolved for the whole file
-      # regardless of items-to-include — so this job needs the same variables as deploy-bronze
-      # even though no landing item uses the platform metadata DB connection.
-      parameter-env-vars: |
-        FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID=${{ vars.TEST_PLATFORM_METADATA_DB_CONNECTION_ID }}
-    secrets: inherit
-
   deploy-bronze:
-    needs: deploy-landing
     uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
     with:
       workspace-id: ${{ vars.TEST_BRONZE_WORKSPACE_ID }}
@@ -37,10 +27,27 @@ jobs:
       repository-directory: datasource_nyc_taxi
       items-in-scope: "Lakehouse,DataPipeline"
       items-to-include: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline"
-      # landing_bronze_copy_job.CopyJob is gone — pl_bronze_nyc_taxi now does the copy itself via
-      # a Lookup+Copy chain against platform-core's metadata DB (see
-      # ms-fabric-platform-core/docs/metadata-db-mapping.md). The one connection ID that can't
-      # resolve live is now the SQL connection to that DB, not a CopyJob connection.
+      # pl_bronze_nyc_taxi has zero find_replace rules of its own now — fully parameter-driven,
+      # both source and destination resolved at run time by pl_master_landing. This job still
+      # needs the platform-metadata-DB connection variable below even though no item it publishes
+      # uses it: $ENV: tokens are resolved for the whole shared parameter.yml file regardless of
+      # items-to-include, and pl_master_landing's rule referencing it lives in the same file.
+      parameter-env-vars: |
+        FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID=${{ vars.TEST_PLATFORM_METADATA_DB_CONNECTION_ID }}
+    secrets: inherit
+
+  deploy-landing:
+    needs: deploy-bronze
+    uses: vtiyer89/ms-fabric-platform-core/.github/workflows/deploy-fabric-item.yml@main
+    with:
+      workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
+      environment-name: TEST
+      repository-directory: datasource_nyc_taxi
+      items-in-scope: "Lakehouse,DataPipeline"
+      items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline,pl_master_landing.DataPipeline"
+      # pl_master_landing needs both: the platform metadata DB connection (its two Lookups call
+      # metadata.usp_GetCopyJobConfig) and pl_bronze_nyc_taxi's live item ID (its InvokePipeline
+      # activity) — the latter is why this job needs: deploy-bronze above.
       # Pass repo Variables here, never Secrets: these values appear in workflow logs.
       parameter-env-vars: |
         FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID=${{ vars.TEST_PLATFORM_METADATA_DB_CONNECTION_ID }}

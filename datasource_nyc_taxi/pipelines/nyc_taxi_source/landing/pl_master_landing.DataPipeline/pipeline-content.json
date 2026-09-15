@@ -1,0 +1,179 @@
+{
+  "properties": {
+    "parameters": {
+      "SourceObjectName": {
+        "type": "String",
+        "defaultValue": "yellow_cab_trip_data"
+      },
+      "SourceLayerName": {
+        "type": "String",
+        "defaultValue": "Landing"
+      },
+      "TargetLayerName": {
+        "type": "String",
+        "defaultValue": "Bronze"
+      }
+    },
+    "activities": [
+      {
+        "type": "Lookup",
+        "name": "lkp_source_location",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderStoredProcedureName": "[metadata].[usp_GetCopyJobConfig]",
+            "storedProcedureParameters": {
+              "SourceObjectName": {
+                "value": {
+                  "value": "@pipeline().parameters.SourceObjectName",
+                  "type": "Expression"
+                },
+                "type": "String"
+              },
+              "LayerName": {
+                "value": {
+                  "value": "@pipeline().parameters.SourceLayerName",
+                  "type": "Expression"
+                },
+                "type": "String"
+              }
+            },
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None"
+          },
+          "datasetSettings": {
+            "type": "AzureSqlTable",
+            "typeProperties": {
+              "schema": "metadata",
+              "table": "SourceObjectConfig"
+            },
+            "externalReferences": {
+              "connection": "deadbeef-0000-0000-0000-000000000001"
+            }
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "type": "Lookup",
+        "name": "lkp_target_location",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderStoredProcedureName": "[metadata].[usp_GetCopyJobConfig]",
+            "storedProcedureParameters": {
+              "SourceObjectName": {
+                "value": {
+                  "value": "@pipeline().parameters.SourceObjectName",
+                  "type": "Expression"
+                },
+                "type": "String"
+              },
+              "LayerName": {
+                "value": {
+                  "value": "@pipeline().parameters.TargetLayerName",
+                  "type": "Expression"
+                },
+                "type": "String"
+              }
+            },
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None"
+          },
+          "datasetSettings": {
+            "type": "AzureSqlTable",
+            "typeProperties": {
+              "schema": "metadata",
+              "table": "SourceObjectConfig"
+            },
+            "externalReferences": {
+              "connection": "deadbeef-0000-0000-0000-000000000001"
+            }
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "type": "InvokePipeline",
+        "name": "invoke_bronze_copy",
+        "dependsOn": [
+          {
+            "activity": "lkp_source_location",
+            "dependencyConditions": ["Succeeded"]
+          },
+          {
+            "activity": "lkp_target_location",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "waitOnCompletion": true,
+          "operationType": "InvokeFabricPipeline",
+          "pipelineId": "deadbeef-0000-0000-0000-000000000002",
+          "workspaceId": "3ab4eb52-fcd3-48e0-a92c-3e3feb437a79",
+          "parameters": {
+            "SourceWorkSpaceId": {
+              "value": "@activity('lkp_source_location').output.firstRow.TargetWorkSpaceId",
+              "type": "Expression"
+            },
+            "SourceLakehouseId": {
+              "value": "@activity('lkp_source_location').output.firstRow.TargetLakehouseId",
+              "type": "Expression"
+            },
+            "FileName": {
+              "value": "@activity('lkp_source_location').output.firstRow.FileName",
+              "type": "Expression"
+            },
+            "Compression": {
+              "value": "@activity('lkp_source_location').output.firstRow.Compression",
+              "type": "Expression"
+            },
+            "TargetWorkSpaceId": {
+              "value": "@activity('lkp_target_location').output.firstRow.TargetWorkSpaceId",
+              "type": "Expression"
+            },
+            "TargetLakehouseId": {
+              "value": "@activity('lkp_target_location').output.firstRow.TargetLakehouseId",
+              "type": "Expression"
+            },
+            "TargetSchema": {
+              "value": "@activity('lkp_target_location').output.firstRow.TargetSchema",
+              "type": "Expression"
+            },
+            "TargetName": {
+              "value": "@activity('lkp_target_location').output.firstRow.TargetName",
+              "type": "Expression"
+            },
+            "LoadType": {
+              "value": "@activity('lkp_target_location').output.firstRow.LoadType",
+              "type": "Expression"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

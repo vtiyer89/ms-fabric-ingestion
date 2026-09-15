@@ -1,115 +1,40 @@
 {
   "properties": {
     "parameters": {
-      "SourceSystemName": {
-        "type": "String",
-        "defaultValue": "nyc_taxi_yellow"
+      "SourceWorkSpaceId": {
+        "type": "String"
+      },
+      "SourceLakehouseId": {
+        "type": "String"
+      },
+      "FileName": {
+        "type": "String"
+      },
+      "Compression": {
+        "type": "String"
+      },
+      "TargetWorkSpaceId": {
+        "type": "String"
+      },
+      "TargetLakehouseId": {
+        "type": "String"
+      },
+      "TargetSchema": {
+        "type": "String"
       },
       "TargetName": {
+        "type": "String"
+      },
+      "LoadType": {
         "type": "String",
-        "defaultValue": "yellow_cab_trip_data_bronze"
+        "defaultValue": "Overwrite"
       }
     },
     "activities": [
       {
-        "type": "Lookup",
-        "name": "lkp_source",
-        "dependsOn": [],
-        "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 0,
-          "retryIntervalInSeconds": 30,
-          "secureInput": false,
-          "secureOutput": false
-        },
-        "typeProperties": {
-          "source": {
-            "type": "AzureSqlSource",
-            "sqlReaderQuery": "SELECT TOP (1) SourceSystemName, SourceType, Config FROM metadata.SourceSystemConfig WHERE SourceSystemName = @SourceSystemName AND IsActive = 1",
-            "queryTimeout": "02:00:00",
-            "isolationLevel": "ReadCommitted",
-            "partitionOption": "None",
-            "additionalColumns": [],
-            "sqlReaderQueryParameters": [
-              {
-                "name": "SourceSystemName",
-                "value": {
-                  "value": "@pipeline().parameters.SourceSystemName",
-                  "type": "Expression"
-                },
-                "type": "String"
-              }
-            ]
-          },
-          "datasetSettings": {
-            "type": "AzureSqlTable",
-            "typeProperties": {
-              "schema": "metadata",
-              "table": "SourceSystemConfig"
-            },
-            "externalReferences": {
-              "connection": "deadbeef-0000-0000-0000-000000000001"
-            }
-          },
-          "firstRowOnly": true
-        }
-      },
-      {
-        "type": "Lookup",
-        "name": "lkp_target",
-        "dependsOn": [],
-        "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 0,
-          "retryIntervalInSeconds": 30,
-          "secureInput": false,
-          "secureOutput": false
-        },
-        "typeProperties": {
-          "source": {
-            "type": "AzureSqlSource",
-            "sqlReaderQuery": "SELECT TOP (1) TargetName, TargetPath, LayerName, TargetWorkSpaceId, TargetLakehouseId, TargetSchema, Config FROM metadata.TargetStoreConfig WHERE TargetName = @TargetName AND IsActive = 1",
-            "queryTimeout": "02:00:00",
-            "isolationLevel": "ReadCommitted",
-            "partitionOption": "None",
-            "additionalColumns": [],
-            "sqlReaderQueryParameters": [
-              {
-                "name": "TargetName",
-                "value": {
-                  "value": "@pipeline().parameters.TargetName",
-                  "type": "Expression"
-                },
-                "type": "String"
-              }
-            ]
-          },
-          "datasetSettings": {
-            "type": "AzureSqlTable",
-            "typeProperties": {
-              "schema": "metadata",
-              "table": "TargetStoreConfig"
-            },
-            "externalReferences": {
-              "connection": "deadbeef-0000-0000-0000-000000000001"
-            }
-          },
-          "firstRowOnly": true
-        }
-      },
-      {
         "type": "Copy",
         "name": "cp_landing_to_bronze",
-        "dependsOn": [
-          {
-            "activity": "lkp_source",
-            "dependencyConditions": ["Succeeded"]
-          },
-          {
-            "activity": "lkp_target",
-            "dependencyConditions": ["Succeeded"]
-          }
-        ],
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -131,38 +56,12 @@
                 "location": {
                   "type": "LakehouseLocation",
                   "fileName": {
-                    "value": "@activity('lkp_source').output.firstRow.Config.fileName",
+                    "value": "@pipeline().parameters.FileName",
                     "type": "Expression"
                   }
                 },
                 "compressionCodec": {
-                  "value": "@activity('lkp_source').output.firstRow.Config.compression",
-                  "type": "Expression"
-                }
-              },
-              "connectionSettings": {
-                "type": "Lakehouse",
-                "typeProperties": {
-                  "workspaceId": "37f9f143-c972-45c2-9ae6-995b7639dff5",
-                  "artifactId": "95e9be52-6ce5-4912-9264-d8c101939c5f",
-                  "rootFolder": "Files"
-                }
-              }
-            }
-          },
-          "sink": {
-            "type": "LakehouseTableSink",
-            "tableActionOption": "Overwrite",
-            "partitionOption": "None",
-            "datasetSettings": {
-              "type": "LakehouseTable",
-              "typeProperties": {
-                "schema": {
-                  "value": "@activity('lkp_target').output.firstRow.TargetSchema",
-                  "type": "Expression"
-                },
-                "table": {
-                  "value": "@activity('lkp_target').output.firstRow.TargetName",
+                  "value": "@pipeline().parameters.Compression",
                   "type": "Expression"
                 }
               },
@@ -170,11 +69,46 @@
                 "type": "Lakehouse",
                 "typeProperties": {
                   "workspaceId": {
-                    "value": "@activity('lkp_target').output.firstRow.TargetWorkSpaceId",
+                    "value": "@pipeline().parameters.SourceWorkSpaceId",
                     "type": "Expression"
                   },
                   "artifactId": {
-                    "value": "@activity('lkp_target').output.firstRow.TargetLakehouseId",
+                    "value": "@pipeline().parameters.SourceLakehouseId",
+                    "type": "Expression"
+                  },
+                  "rootFolder": "Files"
+                }
+              }
+            }
+          },
+          "sink": {
+            "type": "LakehouseTableSink",
+            "tableActionOption": {
+              "value": "@pipeline().parameters.LoadType",
+              "type": "Expression"
+            },
+            "partitionOption": "None",
+            "datasetSettings": {
+              "type": "LakehouseTable",
+              "typeProperties": {
+                "schema": {
+                  "value": "@pipeline().parameters.TargetSchema",
+                  "type": "Expression"
+                },
+                "table": {
+                  "value": "@pipeline().parameters.TargetName",
+                  "type": "Expression"
+                }
+              },
+              "connectionSettings": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "workspaceId": {
+                    "value": "@pipeline().parameters.TargetWorkSpaceId",
+                    "type": "Expression"
+                  },
+                  "artifactId": {
+                    "value": "@pipeline().parameters.TargetLakehouseId",
                     "type": "Expression"
                   },
                   "rootFolder": "Tables"

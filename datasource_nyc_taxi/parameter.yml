@@ -7,12 +7,16 @@
 # See docs/fabric-test-workspace-sync.md for how to obtain each TEST value.
 
 find_replace:
-    # --- pl_bronze_nyc_taxi's two Lookup activities: connection to platform-core's SQL database ---
-    # metadata-driven POC (see ms-fabric-platform-core/docs/metadata-db-mapping.md and
-    # scripts/seed_metadata_db.py). Connections are tenant objects, not Fabric items, so no
-    # $workspace/$items variable reaches them — supplied as GitHub repo Variables via
-    # FABRIC_PARAM_<NAME> (see scripts/deploy_fabric_item.py), same pattern the old CopyJob
-    # connection used. "deadbeef-0000-0000-0000-000000000001" is a placeholder sentinel — no such
+    # --- pl_master_landing's Lookup activity (calls metadata.usp_GetCopyJobConfig): connection
+    # to platform-core's SQL database --- metadata-driven POC, master/child copy pattern
+    # (see ms-fabric-platform-core/docs/metadata-db-mapping.md, scripts/seed_metadata_db.py,
+    # platform/sql/005_create_usp_get_copy_config.sql). Connections are tenant objects, not
+    # Fabric items, so no $workspace/$items variable reaches them — supplied as GitHub repo
+    # Variables via FABRIC_PARAM_<NAME> (see scripts/deploy_fabric_item.py), same pattern the old
+    # CopyJob connection used. Previously this lived on pl_bronze_nyc_taxi directly (when it did
+    # its own two Lookups); moved here when the resolution logic moved to the master pipeline —
+    # pl_bronze_nyc_taxi (the child) no longer touches the metadata DB at all, it just takes
+    # parameters. "deadbeef-0000-0000-0000-000000000001" is a placeholder sentinel — no such
     # connection exists in Dev yet (there is no Dev platform workspace either, see CLAUDE.md
     # Known-unverified), so DEV deliberately leaves it unresolved. TEST must be created for real
     # and TEST_PLATFORM_METADATA_DB_CONNECTION_ID set to match before this pipeline can run there.
@@ -21,24 +25,41 @@ find_replace:
           DEV: "deadbeef-0000-0000-0000-000000000001"
           TEST: "$ENV:TEST_PLATFORM_METADATA_DB_CONNECTION_ID"
       item_type: "DataPipeline"
-      item_name: "pl_bronze_nyc_taxi"
+      item_name: "pl_master_landing"
 
-    # --- cp_landing_to_bronze's source: the LANDING workspace's landing lakehouse ---
-    # Still deploy-time identity (which physical lakehouse holds the parquet file) — unlike the
-    # destination below, which is now resolved at run time from TargetStoreConfig and needs no
-    # find_replace rule at all. This is a genuine cross-workspace reference: pl_bronze_nyc_taxi is
-    # published by the bronze job, but its source is the Landing workspace. These resolve live,
-    # so Landing must deploy first — `needs: deploy-landing` in the caller workflow enforces that.
-    - find_value: "37f9f143-c972-45c2-9ae6-995b7639dff5"
+    # --- pl_master_landing's InvokePipeline activity: cross-workspace reference to
+    # pl_bronze_nyc_taxi (the child), published by the Bronze job to the Bronze workspace, while
+    # pl_master_landing itself is published by the Landing job to the Landing workspace. Deploy-
+    # time identity, resolved live. This is now the ONLY cross-workspace reference left in this
+    # repo — pl_bronze_nyc_taxi itself has zero find_replace rules (see below): it's fully
+    # parameter-driven now, both source and destination resolved at run time by pl_master_landing
+    # via two calls to usp_GetCopyJobConfig (LayerName='Landing' and LayerName='Bronze').
+    # Bronze must therefore deploy before Landing for this rule to resolve — see deploy-test.yml's
+    # `needs: deploy-bronze` on the deploy-master-landing job. This inverts the old CopyJob-era
+    # ordering (Landing had to deploy first, since the CopyJob referenced Landing's lakehouse by
+    # static GUID) — that static reference is gone now too, replaced by pl_master_landing's
+    # lkp_source_location call, so nothing in this repo needs Landing's items to exist first
+    # anymore. "deadbeef-0000-0000-0000-000000000002" is a placeholder: pl_bronze_nyc_taxi's live
+    # Fabric item GUID isn't known ahead of a real deploy (its .platform logicalId is a
+    # git-tracking value, not the same as its published item ID).
+    - find_value: "deadbeef-0000-0000-0000-000000000002"
       replace_value:
-          DEV: "37f9f143-c972-45c2-9ae6-995b7639dff5"
-          TEST: "$workspace.ws-test-landing-rjoose-v2.$id"
+          DEV: "deadbeef-0000-0000-0000-000000000002"
+          TEST: "$workspace.ws-test-bronze-rjoose-v2.$items.DataPipeline.pl_bronze_nyc_taxi.$id"
       item_type: "DataPipeline"
-      item_name: "pl_bronze_nyc_taxi"
+      item_name: "pl_master_landing"
 
-    - find_value: "95e9be52-6ce5-4912-9264-d8c101939c5f"
+    - find_value: "3ab4eb52-fcd3-48e0-a92c-3e3feb437a79"
       replace_value:
-          DEV: "95e9be52-6ce5-4912-9264-d8c101939c5f"
-          TEST: "$workspace.ws-test-landing-rjoose-v2.$items.Lakehouse.lh_landing_nyc_taxi.$id"
+          DEV: "3ab4eb52-fcd3-48e0-a92c-3e3feb437a79"
+          TEST: "$workspace.ws-test-bronze-rjoose-v2.$id"
       item_type: "DataPipeline"
-      item_name: "pl_bronze_nyc_taxi"
+      item_name: "pl_master_landing"
+
+    # pl_bronze_nyc_taxi (the child) deliberately has NO find_replace rules of its own anymore.
+    # Both its source (Landing lakehouse) and destination (Bronze lakehouse/schema/table) are now
+    # pipeline parameters, resolved entirely at run time by pl_master_landing above — that's what
+    # makes it a genuinely reusable copy template rather than a pipeline hardcoded to one
+    # landing-to-bronze move. The Landing-lakehouse GUIDs that used to be find_replace rules here
+    # (37f9f143-... / 95e9be52-...) are gone from this file; they're resolved live by
+    # pl_master_landing's lkp_source_location activity instead.
