@@ -1,1 +1,0 @@
-This is an auto-created file for datasource_nyc_taxi/pipelines

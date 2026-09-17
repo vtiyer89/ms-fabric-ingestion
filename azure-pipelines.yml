@@ -1,14 +1,17 @@
 # Deploy ms-fabric-ingestion to the Fabric Test workspaces (Azure DevOps).
 #
 # Landing and Bronze are separate Fabric workspaces, so this pipeline has two jobs — the same
-# shape as ms-fabric-dd-trip-data's silver/gold split.
+# shape as ms-fabric-dd-trip-data's silver/gold split. Each job now owns its own directory
+# (datasource_nyc_taxi/bronze, datasource_nyc_taxi/landing) and publishes everything in it — no
+# itemsToInclude list, so nothing here is artifact-name dependent.
 #
-# Both jobs share one repositoryDirectory (and therefore one parameter.yml); itemsToInclude
-# decides which items each publishes. The two lists together must cover every item in
-# datasource_nyc_taxi, or the uncovered ones are silently never deployed.
-#
-# Bronze waits on Landing: landing_bronze_copy_job's source resolves lh_landing_nyc_taxi by
-# name in the Landing workspace, so that lakehouse must exist first.
+# Landing waits on Bronze. pl_master_landing (in Landing) invokes pl_bronze_nyc_taxi (in Bronze)
+# via a cross-workspace InvokePipeline reference that resolves pl_bronze_nyc_taxi's live item
+# GUID at deploy time, so Bronze must exist first. Neither pipeline has a static, deploy-time
+# dependency on the other's lakehouse anymore — both source and destination for the actual copy
+# are resolved at *run time* by pl_master_landing via metadata.usp_GetCopyJobConfig (see
+# ms-fabric-platform-core/docs/metadata-db-mapping.md and
+# platform/sql/005_create_usp_get_copy_config.sql).
 
 trigger: none
 pr: none
@@ -23,32 +26,29 @@ resources:
 jobs:
   - template: pipelines/templates/deploy-fabric-item.yml@platform-core
     parameters:
-      jobName: deploy_landing
-      jobDisplayName: "Deploy Landing"
-      variableGroups: [fabric-cicd-common, fabric-ingestion]
-      workspaceId: $(TEST_LANDING_WORKSPACE_ID)
-      environmentName: TEST
-      repositoryDirectory: datasource_nyc_taxi
-      itemsInScope: "Lakehouse,DataPipeline,CopyJob"
-      itemsToInclude: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline"
-      # Both jobs share one parameter.yml, and its $ENV: tokens are resolved for the whole file
-      # regardless of itemsToInclude — so this job needs the same variables as deploy_bronze
-      # even though no landing item uses the copy-job connection.
-      parameterEnvVars:
-        DEV_COPY_JOB_CONNECTION_ID: $(DEV_COPY_JOB_CONNECTION_ID)
-        TEST_COPY_JOB_CONNECTION_ID: $(TEST_COPY_JOB_CONNECTION_ID)
-
-  - template: pipelines/templates/deploy-fabric-item.yml@platform-core
-    parameters:
       jobName: deploy_bronze
       jobDisplayName: "Deploy Bronze"
-      dependsOn: [deploy_landing]
       variableGroups: [fabric-cicd-common, fabric-ingestion]
       workspaceId: $(TEST_BRONZE_WORKSPACE_ID)
       environmentName: TEST
-      repositoryDirectory: datasource_nyc_taxi
-      itemsInScope: "Lakehouse,DataPipeline,CopyJob"
-      itemsToInclude: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline,landing_bronze_copy_job.CopyJob"
+      repositoryDirectory: datasource_nyc_taxi/bronze
+      itemsInScope: "Lakehouse,DataPipeline"
+      # pl_bronze_nyc_taxi has zero find_replace rules of its own — fully parameter-driven, both
+      # source and destination resolved at run time by pl_master_landing. This directory has no
+      # parameter.yml at all, so no parameterEnvVars are needed here.
+
+  - template: pipelines/templates/deploy-fabric-item.yml@platform-core
+    parameters:
+      jobName: deploy_landing
+      jobDisplayName: "Deploy Landing"
+      dependsOn: [deploy_bronze]
+      variableGroups: [fabric-cicd-common, fabric-ingestion]
+      workspaceId: $(TEST_LANDING_WORKSPACE_ID)
+      environmentName: TEST
+      repositoryDirectory: datasource_nyc_taxi/landing
+      itemsInScope: "Lakehouse,DataPipeline"
+      # pl_master_landing needs both: the platform metadata DB connection (its two Lookups call
+      # metadata.usp_GetCopyJobConfig) and pl_bronze_nyc_taxi's live item ID (its InvokePipeline
+      # activity) — the latter is why this job depends on deploy_bronze above.
       parameterEnvVars:
-        DEV_COPY_JOB_CONNECTION_ID: $(DEV_COPY_JOB_CONNECTION_ID)
-        TEST_COPY_JOB_CONNECTION_ID: $(TEST_COPY_JOB_CONNECTION_ID)
+        TEST_PLATFORM_METADATA_DB_CONNECTION_ID: $(TEST_PLATFORM_METADATA_DB_CONNECTION_ID)

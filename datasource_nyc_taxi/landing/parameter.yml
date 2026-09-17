@@ -1,5 +1,9 @@
-# fabric-cicd parameterization for the "Ingestion" workspace
-# (landing lakehouse, bronze lakehouse, landing/bronze pipelines, bronze copy job)
+# fabric-cicd parameterization for the Landing workspace.
+# repository_directory = datasource_nyc_taxi/landing, one of the two directories this repo now
+# deploys directly (the other is datasource_nyc_taxi/bronze) -- no items-to-include list, every
+# item under this directory publishes. Covers lh_landing_nyc_taxi.Lakehouse (no rules of its own,
+# every reference to it is a live self/cross-workspace lookup), pl_landing_nyc_ingest, and
+# pl_master_landing (all the rules below).
 #
 # Environments: DEV (current hardcoded values, kept here for documentation/debug_parameterization.py),
 #               TEST (fill in the placeholders below once the Test workspace + its items exist)

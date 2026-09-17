@@ -1,0 +1,94 @@
+# ============================================================================
+# TEMPLATE — every tenant-specific value is a <PLACEHOLDER>. Copy to
+# parameter.yml in this same directory and fill it in. See
+# ms-fabric-platform-core/docs/ado-parameter-templating.md for what each one is
+# and where to find it.
+#
+# Two classes of placeholder, filled in different ways:
+#
+#   <YOUR-DEV-*>          GUIDs from YOUR Dev tenant. These are find_value entries and must
+#                         match the GUID literally present in the git-exported item JSON, or
+#                         fabric-cicd skips the rule silently and ships the Dev value. The
+#                         deploy script's assert_find_values_present guard fails the run if
+#                         one matches nothing — that guard is the safety net, use it.
+#
+#   <YOUR-TEST-*-WS-NAME> Test workspace DISPLAY names, matched literally and CASE-SENSITIVELY
+#                         by the Fabric API. Also held in the fabric-cicd-common variable
+#                         group, so keep the two in step when a workspace is renamed.
+#
+#   <YOUR-*-NAME>         Fabric ITEM display names — the `displayName` in each item's
+#                         .platform file (usually, but not necessarily, the folder name).
+#                         They appear both as `item_name:` (which item a rule applies to) and
+#                         inside `$items.<Type>.<name>.$id` lookups. Also matched literally
+#                         and case-sensitively; a wrong one in `item_name:` makes the rule
+#                         apply to nothing, and a wrong one in `$items.` fails the deploy at
+#                         the API lookup.
+#
+# Connection IDs are NOT placeholders here — they stay as $ENV: tokens fed from the per-repo
+# variable group, because they are the one class that cannot resolve live.
+#
+# A `deadbeef-0000-0000-0000-00000000000N` value is a deliberate placeholder sentinel, not a
+# <PLACEHOLDER> to fill in: it marks a real cross-workspace/connection reference with no Dev
+# equivalent yet (no Dev platform workspace, no Dev SQL connection). Leave it as-is; only TEST
+# resolves for real. See CLAUDE.md's "Conventions" section under "Identity resolution".
+# ============================================================================
+
+# fabric-cicd parameterization for the Landing workspace
+# (repository_directory = datasource_nyc_taxi/landing: lh_landing_nyc_taxi.Lakehouse,
+#  pl_landing_nyc_ingest.DataPipeline, pl_master_landing.DataPipeline)
+#
+# Environments: DEV (current hardcoded values, kept here for documentation/debug_parameterization.py),
+#               TEST (fill in the placeholders below once the Test workspace + its items exist)
+#
+# See docs/fabric-test-workspace-sync.md for how to obtain each TEST value.
+
+find_replace:
+    # --- pl_master_landing's Lookup activity (calls metadata.usp_GetCopyJobConfig): connection
+    # to platform-core's SQL database. Connections are tenant objects, not Fabric items, so no
+    # $workspace/$items variable reaches them — supplied as a repo Variable via
+    # FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID (see scripts/deploy_fabric_item.py).
+    - find_value: "deadbeef-0000-0000-0000-000000000001"
+      replace_value:
+          DEV: "deadbeef-0000-0000-0000-000000000001"
+          TEST: "$ENV:TEST_PLATFORM_METADATA_DB_CONNECTION_ID"
+      item_type: "DataPipeline"
+      item_name: "<YOUR-MASTER-LANDING-PIPELINE-NAME>"
+
+    # --- pl_master_landing's two Lookup activities: the native item reference to
+    # db_platform_metadata (workspaceId + artifactId), required alongside the connection rule
+    # above — see CLAUDE.md's "FabricSqlDatabase connector gotcha" for why both are needed.
+    - find_value: "deadbeef-0000-0000-0000-000000000003"
+      replace_value:
+          DEV: "deadbeef-0000-0000-0000-000000000003"
+          TEST: "$workspace.<YOUR-TEST-PLATFORM-WS-NAME>.$id"
+      item_type: "DataPipeline"
+      item_name: "<YOUR-MASTER-LANDING-PIPELINE-NAME>"
+
+    - find_value: "deadbeef-0000-0000-0000-000000000004"
+      replace_value:
+          DEV: "deadbeef-0000-0000-0000-000000000004"
+          TEST: "$workspace.<YOUR-TEST-PLATFORM-WS-NAME>.$items.SQLDatabase.<YOUR-METADATA-DB-NAME>.$id"
+      item_type: "DataPipeline"
+      item_name: "<YOUR-MASTER-LANDING-PIPELINE-NAME>"
+
+    # --- pl_master_landing's InvokePipeline activity: cross-workspace reference to
+    # pl_bronze_nyc_taxi, published by the Bronze job (datasource_nyc_taxi/bronze) to the Bronze
+    # workspace. Bronze must therefore deploy before Landing — see deploy-test.yml's
+    # `needs: deploy-bronze`.
+    - find_value: "deadbeef-0000-0000-0000-000000000002"
+      replace_value:
+          DEV: "deadbeef-0000-0000-0000-000000000002"
+          TEST: "$workspace.<YOUR-TEST-BRONZE-WS-NAME>.$items.DataPipeline.<YOUR-BRONZE-COPY-PIPELINE-NAME>.$id"
+      item_type: "DataPipeline"
+      item_name: "<YOUR-MASTER-LANDING-PIPELINE-NAME>"
+
+    - find_value: "<YOUR-DEV-BRONZE-WORKSPACE-ID>"
+      replace_value:
+          DEV: "<YOUR-DEV-BRONZE-WORKSPACE-ID>"
+          TEST: "$workspace.<YOUR-TEST-BRONZE-WS-NAME>.$id"
+      item_type: "DataPipeline"
+      item_name: "<YOUR-MASTER-LANDING-PIPELINE-NAME>"
+
+    # pl_bronze_nyc_taxi (in datasource_nyc_taxi/bronze) deliberately has NO find_replace rules
+    # of its own — both its source and destination are pipeline parameters, resolved entirely at
+    # run time by pl_master_landing above via two calls to usp_GetCopyJobConfig.

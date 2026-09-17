@@ -1,18 +1,16 @@
 name: Deploy to Fabric Test Workspaces
 
 # Landing and Bronze are separate Fabric workspaces, so this repo has two deploy jobs — the
-# same shape as ms-fabric-dd-trip-data's silver/gold split.
+# same shape as ms-fabric-dd-trip-data's silver/gold split. Each job now owns its own directory
+# (datasource_nyc_taxi/bronze, datasource_nyc_taxi/landing) and publishes everything in it —
+# no items-to-include list, so nothing here is artifact-name dependent.
 #
-# Both jobs share one repository-directory (and therefore one parameter.yml); `items-to-include`
-# decides which items each publishes. The two lists together must cover every item in
-# datasource_nyc_taxi, or the uncovered ones are silently never deployed.
-#
-# Landing waits on Bronze now — inverted from the old CopyJob-era order. pl_master_landing (in
-# Landing) invokes pl_bronze_nyc_taxi (in Bronze) via a cross-workspace InvokePipeline reference
-# that resolves pl_bronze_nyc_taxi's live item GUID at deploy time, so Bronze must exist first.
-# Neither pipeline has a static, deploy-time dependency on the other's lakehouse anymore — both
-# source and destination for the actual copy are resolved at *run time* by pl_master_landing via
-# metadata.usp_GetCopyJobConfig (see ms-fabric-platform-core/docs/metadata-db-mapping.md and
+# Landing waits on Bronze. pl_master_landing (in Landing) invokes pl_bronze_nyc_taxi (in Bronze)
+# via a cross-workspace InvokePipeline reference that resolves pl_bronze_nyc_taxi's live item
+# GUID at deploy time, so Bronze must exist first. Neither pipeline has a static, deploy-time
+# dependency on the other's lakehouse anymore — both source and destination for the actual copy
+# are resolved at *run time* by pl_master_landing via metadata.usp_GetCopyJobConfig (see
+# ms-fabric-platform-core/docs/metadata-db-mapping.md and
 # platform/sql/005_create_usp_get_copy_config.sql). The only deploy-time cross-workspace
 # reference left in this repo is pl_master_landing -> pl_bronze_nyc_taxi's item ID.
 on:
@@ -24,16 +22,11 @@ jobs:
     with:
       workspace-id: ${{ vars.TEST_BRONZE_WORKSPACE_ID }}
       environment-name: TEST
-      repository-directory: datasource_nyc_taxi
+      repository-directory: datasource_nyc_taxi/bronze
       items-in-scope: "Lakehouse,DataPipeline"
-      items-to-include: "lh_bronze_nyc_taxi.Lakehouse,pl_bronze_nyc_taxi.DataPipeline"
-      # pl_bronze_nyc_taxi has zero find_replace rules of its own now — fully parameter-driven,
-      # both source and destination resolved at run time by pl_master_landing. This job still
-      # needs the platform-metadata-DB connection variable below even though no item it publishes
-      # uses it: $ENV: tokens are resolved for the whole shared parameter.yml file regardless of
-      # items-to-include, and pl_master_landing's rule referencing it lives in the same file.
-      parameter-env-vars: |
-        FABRIC_PARAM_TEST_PLATFORM_METADATA_DB_CONNECTION_ID=${{ vars.TEST_PLATFORM_METADATA_DB_CONNECTION_ID }}
+      # pl_bronze_nyc_taxi has zero find_replace rules of its own — fully parameter-driven, both
+      # source and destination resolved at run time by pl_master_landing. This directory has no
+      # parameter.yml at all, so no parameter-env-vars are needed here.
     secrets: inherit
 
   deploy-landing:
@@ -42,9 +35,8 @@ jobs:
     with:
       workspace-id: ${{ vars.TEST_LANDING_WORKSPACE_ID }}
       environment-name: TEST
-      repository-directory: datasource_nyc_taxi
+      repository-directory: datasource_nyc_taxi/landing
       items-in-scope: "Lakehouse,DataPipeline"
-      items-to-include: "lh_landing_nyc_taxi.Lakehouse,pl_landing_nyc_ingest.DataPipeline,pl_master_landing.DataPipeline"
       # pl_master_landing needs both: the platform metadata DB connection (its two Lookups call
       # metadata.usp_GetCopyJobConfig) and pl_bronze_nyc_taxi's live item ID (its InvokePipeline
       # activity) — the latter is why this job needs: deploy-bronze above.
